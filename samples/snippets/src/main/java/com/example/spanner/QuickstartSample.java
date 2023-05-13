@@ -19,11 +19,16 @@ package com.example.spanner;
 // [START spanner_quickstart]
 // Imports the Google Cloud client library
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+import com.google.api.gax.rpc.StatusCode.Code;
+import java.util.HashSet;
+import java.util.Set;
+
 
 /**
  * A quick start code for Cloud Spanner. It demonstrates how to setup the Cloud Spanner client and
@@ -37,7 +42,25 @@ public class QuickstartSample {
       return;
     }
     // Instantiates a client
-    SpannerOptions options = SpannerOptions.newBuilder().build();
+    SpannerOptions.Builder builder = SpannerOptions.newBuilder();
+
+    Set<Code> retryableCodes = new HashSet<>();
+    retryableCodes.add(Code.RESOURCE_EXHAUSTED);
+    // Set retryable codes for all API methods
+    builder
+        .getSpannerStubSettingsBuilder()
+        .applyToAllUnaryMethods(
+            input -> {
+              input.setRetryableCodes(retryableCodes);
+              return null;
+            });
+    builder
+        .getSpannerStubSettingsBuilder()
+        .executeStreamingSqlSettings()
+        .setRetryableCodes(retryableCodes);
+    builder.setHost("https://staging-wrenchworks.sandbox.googleapis.com");
+    builder.setProjectId("span-cloud-testing");
+    SpannerOptions options = builder.build();
     Spanner spanner = options.getService();
 
     // Name of your instance & database.
@@ -46,7 +69,11 @@ public class QuickstartSample {
     try {
       // Creates a database client
       DatabaseClient dbClient =
-          spanner.getDatabaseClient(DatabaseId.of(options.getProjectId(), instanceId, databaseId));
+          spanner.getDatabaseClient(DatabaseId.of("span-cloud-testing", instanceId, databaseId));
+
+      BatchClient batchClient = spanner.getBatchClient(DatabaseId.of("span-cloud-testing", instanceId, databaseId));
+
+      System.out.println("\n\n spanner dialect " + dbClient.getDialect() + "\n\n");
       // Queries the database
       ResultSet resultSet = dbClient.singleUse().executeQuery(Statement.of("SELECT 1"));
 
@@ -54,6 +81,14 @@ public class QuickstartSample {
       // Prints the results
       while (resultSet.next()) {
         System.out.printf("%d\n\n", resultSet.getLong(0));
+      }
+
+      ResultSet res = dbClient.singleUse().executeQuery(Statement.of("SELECT SingerId from Singers"));
+
+      System.out.println("\n\nSingers Results:\n\n");
+      // Prints the results
+      while (res.next()) {
+        System.out.printf("%d\n\n", res.getLong(0));
       }
     } finally {
       // Closes the client which will free up the resources used

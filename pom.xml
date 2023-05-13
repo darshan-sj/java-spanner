@@ -134,6 +134,7 @@
     <module>proto-google-cloud-spanner-admin-database-v1</module>
     <module>google-cloud-spanner-executor</module>
     <module>google-cloud-spanner-bom</module>
+    <module>samples</module>
   </modules>
 
   <build>
